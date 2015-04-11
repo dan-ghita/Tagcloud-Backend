@@ -74,8 +74,6 @@ def parseData(text, stopwords, wordCount):
 
 if __name__ == '__main__':
 
-    redisCont = redis.StrictRedis(host='localhost', port=6379, db=0)
-    redisCont.flushall()
 
     if sys.argv.__len__() == 3:
         duration = int(sys.argv[1])
@@ -83,6 +81,9 @@ if __name__ == '__main__':
     else:
         print("Error: Bad number of arguments")
         sys.exit(1)
+
+    redisCont = redis.Redis(host='redis', port=6379, db=0)
+    redisCont.flushall()
 
     stopwords = getStopwords()
     data = fetchData(duration)
