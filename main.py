@@ -1,11 +1,11 @@
 __author__ = 'dan'
 
+import redis
 import sys
 import json
 import re
 import tweepy
 import time
-
 
 class StdOutListener(tweepy.StreamListener):
 
@@ -17,8 +17,6 @@ class StdOutListener(tweepy.StreamListener):
 
     def on_data(self, data):
 
-        print("Reading data...")
-
         elapsedTime = time.time() - self.startTime
 
         if elapsedTime > duration:
@@ -28,7 +26,6 @@ class StdOutListener(tweepy.StreamListener):
         decoded = dict(json.loads(data))
 
         if "text" in decoded:
-            print(decoded["text"])
             self.text += decoded["text"]
 
         # Keep fetching
@@ -52,6 +49,7 @@ def fetchData(duration):
     auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_token, access_token_secret)
 
+    print("Reading data...")
     stream = tweepy.Stream(auth, lsn)
 
     stream.sample(False, languages = ['en'])
@@ -65,20 +63,19 @@ def getStopwords():
 def parseData(text, stopwords, wordCount):
 
     text = re.split('[,.:@/\_ -?|#&*><;"\n\t]', text)
-    freq = {}
 
     for word in text:
         word = word.lower()
         if word not in stopwords:
-            if word in freq:
-                freq[word] += 1
-            else:
-                freq[word] = 1
+            redisCont.incr(word, 1)
 
-    for key in freq:
-        wordCount.append({"word": key, "count": freq[key]})
+    for key in redisCont.keys():
+        wordCount.append({"word": key.decode('UTF-8'), "count": int(redisCont.get(key).decode('UTF-8'))})
 
 if __name__ == '__main__':
+
+    redisCont = redis.StrictRedis(host='localhost', port=6379, db=0)
+    redisCont.flushall()
 
     if sys.argv.__len__() == 3:
         duration = int(sys.argv[1])
@@ -88,7 +85,6 @@ if __name__ == '__main__':
         sys.exit(1)
 
     stopwords = getStopwords()
-
     data = fetchData(duration)
 
     wordCount = []
@@ -96,13 +92,16 @@ if __name__ == '__main__':
 
     wordCount = sorted(wordCount, key = lambda k: k['count'], reverse = True)
 
-    # Compress words from nrOfWords to len(wordCount) into wordCount[nrOfWords]
-    wordCount[nrOfWords]["word"] = "other"
-    for i in range(nrOfWords + 1, len(wordCount)):
-        wordCount[nrOfWords]["count"] += wordCount[i]["count"]
+    if nrOfWords < len(wordCount):
+        # Compress words from nrOfWords to len(wordCount) into wordCount[nrOfWords]
+        wordCount[nrOfWords]["word"] = "other"
+        for i in range(nrOfWords + 1, len(wordCount)):
+            wordCount[nrOfWords]["count"] += wordCount[i]["count"]
 
-    wordCount = wordCount[:nrOfWords + 1]
+        wordCount = wordCount[:nrOfWords + 1]
 
     json = json.dumps(wordCount, separators=(', ', ': '))
 
-    print(wordCount)
+    print(json)
+
+
