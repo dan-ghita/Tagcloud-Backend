@@ -7,17 +7,17 @@ import re
 import tweepy
 import time
 
-class StdOutListener(tweepy.StreamListener):
+class StreamListener(tweepy.StreamListener):
 
     def __init__(self, duration = 0):
-        super(StdOutListener, self).__init__()
+        super(StreamListener, self).__init__()
         self.text = ""
-        self.startTime = time.time()
+        self.start_time = time.time()
         self.duration = duration
 
     def on_data(self, data):
 
-        elapsedTime = time.time() - self.startTime
+        elapsedTime = time.time() - self.start_time
 
         if elapsedTime > duration:
             # Stop fetching data
@@ -35,7 +35,8 @@ class StdOutListener(tweepy.StreamListener):
         print ("error: ", status)
         return False
 
-def fetchData(duration):
+
+def fetch_data(duration):
 
     with open('OAuth.json') as stream:
         keys = dict(json.load(stream))
@@ -45,7 +46,7 @@ def fetchData(duration):
     access_token = keys["access_token"]
     access_token_secret = keys["access_token_secret"]
 
-    lsn = StdOutListener(duration)
+    lsn = StreamListener(duration)
     auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_token, access_token_secret)
 
@@ -56,11 +57,11 @@ def fetchData(duration):
     return lsn.text
 
 
-def getStopwords():
+def get_stopwords():
     with open('stopwords.txt') as inputFile:
         return inputFile.read()
 
-def parseData(text, stopwords, wordCount):
+def parse_data(text, stopwords, word_count):
 
     text = re.split('[,.:@/\_ -?|#&*><;"\n\t]', text)
 
@@ -70,38 +71,44 @@ def parseData(text, stopwords, wordCount):
             redisCont.incr(word, 1)
 
     for key in redisCont.keys():
-        wordCount.append({"word": key.decode('UTF-8'), "count": int(redisCont.get(key).decode('UTF-8'))})
+        word_count.append({"word": key.decode('UTF-8'), "count": int(redisCont.get(key).decode('UTF-8'))})
 
 if __name__ == '__main__':
 
-
     if sys.argv.__len__() == 3:
+        # Should check if arguments are numbers
         duration = int(sys.argv[1])
-        nrOfWords = int(sys.argv[2])
+        nr_of_words = int(sys.argv[2])
     else:
         print("Error: Bad number of arguments")
         sys.exit(1)
 
+    # Initialise redis container an connect to server
     redisCont = redis.Redis(host='redis', port=6379, db=0)
+    # Clear redis container
     redisCont.flushall()
 
-    stopwords = getStopwords()
-    data = fetchData(duration)
+    stopwords = get_stopwords()
+    # Fetch twitter samples for "duration" seconds
+    data = fetch_data(duration)
 
-    wordCount = []
-    parseData(data, stopwords, wordCount)
+    # Initialise word_count and count words in data
+    word_count = []
+    parse_data(data, stopwords, word_count)
 
-    wordCount = sorted(wordCount, key = lambda k: k['count'], reverse = True)
+    # Sort words by count
+    word_count = sorted(word_count, key = lambda k: k['count'], reverse = True)
 
-    if nrOfWords < len(wordCount):
-        # Compress words from nrOfWords to len(wordCount) into wordCount[nrOfWords]
-        wordCount[nrOfWords]["word"] = "other"
-        for i in range(nrOfWords + 1, len(wordCount)):
-            wordCount[nrOfWords]["count"] += wordCount[i]["count"]
+    # Keep first "nr_of_words" words and aggregate the rest into the word "other"
+    if nr_of_words < len(word_count):
+        # Compress words from nr_of_words to len(word_count) into word_count[nr_of_words]
+        word_count[nr_of_words]["word"] = "other"
+        for i in range(nr_of_words + 1, len(word_count)):
+            word_count[nr_of_words]["count"] += word_count[i]["count"]
 
-        wordCount = wordCount[:nrOfWords + 1]
+        word_count = word_count[:nr_of_words + 1]
 
-    json = json.dumps(wordCount, separators=(', ', ': '))
+    json = json.dumps(word_count, separators=(', ', ': '))
 
     print(json)
 
