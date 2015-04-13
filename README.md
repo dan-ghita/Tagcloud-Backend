@@ -11,8 +11,4 @@ From terminal, cd into "Tagcloud-Backend" folder
 Edit Dockerfile to set streaming duration and number of words to be returned
 
 e.g. "CMD python3 main.py 3 5" will fetch data for 3 seconds and display top 5 results
-<pre>
-  <code>
-    $ docker-compose up
-  </code>
-</pre>
+  $ docker-compose up
