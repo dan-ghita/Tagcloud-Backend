@@ -63,7 +63,7 @@ def get_stopwords():
 
 def parse_data(text, stopwords, word_count):
 
-    text = re.split('[,.:@/\_ -?|#&*><;"\n\t]', text)
+    text = re.split('[,.:@\/_ ?|#&*><;"\n\t]', text)
 
     for word in text:
         word = word.lower()
@@ -108,7 +108,7 @@ if __name__ == '__main__':
 
         word_count = word_count[:nr_of_words + 1]
 
-    json = json.dumps(word_count, separators=(', ', ': '))
+    json = json.dumps(word_count, separators=(', ', ': '), indent = 4, ensure_ascii=False)
 
     print(json)
 
