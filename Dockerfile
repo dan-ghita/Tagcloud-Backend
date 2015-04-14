@@ -4,4 +4,4 @@ ADD requirements.txt /code/
 RUN pip install -r requirements.txt
 ADD . /code
 # main.py takes two arguments, the duration of the streaming process and the number of words to be kept, before aggregating the rest into "other"
-CMD python3 main.py 3 5
+CMD python main.py 3 5
