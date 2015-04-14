@@ -7,6 +7,7 @@ import re
 import tweepy
 import time
 
+
 class StreamListener(tweepy.StreamListener):
 
     def __init__(self, duration = 0):
@@ -19,7 +20,7 @@ class StreamListener(tweepy.StreamListener):
 
         elapsedTime = time.time() - self.start_time
 
-        if elapsedTime > duration:
+        if elapsedTime > self.duration:
             # Stop fetching data
             return False
 
@@ -32,7 +33,7 @@ class StreamListener(tweepy.StreamListener):
         return True
 
     def on_error(self, status):
-        print ("error: ", status)
+        print("error: ", status)
         return False
 
 
@@ -61,7 +62,8 @@ def get_stopwords():
     with open('stopwords.txt') as inputFile:
         return inputFile.read()
 
-def parse_data(text, stopwords, word_count):
+
+def parse_data(text, stopwords, word_count, redisCont):
 
     text = re.split('[,.:@\/_ ?|#&*><;"\n\t]', text)
 
@@ -73,12 +75,17 @@ def parse_data(text, stopwords, word_count):
     for key in redisCont.keys():
         word_count.append({"word": key.decode('UTF-8'), "count": int(redisCont.get(key).decode('UTF-8'))})
 
-if __name__ == '__main__':
 
+def main():
+
+    # Parse cmd args
     if sys.argv.__len__() == 3:
-        # Should check if arguments are numbers
-        duration = int(sys.argv[1])
-        nr_of_words = int(sys.argv[2])
+        try:
+            duration = int(sys.argv[1])
+            nr_of_words = int(sys.argv[2])
+        except:
+            print("Error: main.py must receive two integers as arguments")
+            sys.exit(1)
     else:
         print("Error: Bad number of arguments")
         sys.exit(1)
@@ -94,7 +101,7 @@ if __name__ == '__main__':
 
     # Initialise word_count and count words in data
     word_count = []
-    parse_data(data, stopwords, word_count)
+    parse_data(data, stopwords, word_count, redisCont)
 
     # Sort words by count
     word_count = sorted(word_count, key = lambda k: k['count'], reverse = True)
@@ -105,12 +112,15 @@ if __name__ == '__main__':
         word_count[nr_of_words]["word"] = "other"
         for i in range(nr_of_words + 1, len(word_count)):
             word_count[nr_of_words]["count"] += word_count[i]["count"]
-
         word_count = word_count[:nr_of_words + 1]
 
-    json = json.dumps(word_count, separators=(', ', ': '), indent = 4, ensure_ascii=False)
-    
+    word_count_json = json.dumps(word_count, separators=(', ', ': '), indent = 4, ensure_ascii = False)
 
-    print(json)
+    with open("data.json", "w+") as output:
+        output.write(word_count_json)
+
+    print("Done!")
 
 
+if __name__ == '__main__':
+    main()
