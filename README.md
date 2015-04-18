@@ -14,6 +14,7 @@ Edit "Dockerfile" to set streaming duration and number of words to be returned
 
 e.g. "CMD python main.py 3 5" will fetch data for 3 seconds and display top 5 results
   
+    $ docker-compose build
     $ docker-compose up
 
 You will find the output in "data.json"
