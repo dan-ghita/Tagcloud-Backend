@@ -18,9 +18,9 @@ class StreamListener(tweepy.StreamListener):
 
     def on_data(self, data):
 
-        elapsedTime = time.time() - self.start_time
+        elapsed_time = time.time() - self.start_time
 
-        if elapsedTime > self.duration:
+        if elapsed_time > self.duration:
             # Stop fetching data
             return False
 
@@ -51,7 +51,8 @@ def fetch_data(duration):
     auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_token, access_token_secret)
 
-    print("Reading data...")
+    print("Fetching data...")
+
     stream = tweepy.Stream(auth, lsn)
 
     stream.sample(False, languages = ['en'])
@@ -65,15 +66,21 @@ def get_stopwords():
 
 def parse_data(text, stopwords, word_count, redisCont):
 
-    text = re.split('[,.:@\/_ ?|#&*><;"\n\t]', text)
+    cnt = 0
+
+    # Remove links
+    text = re.sub('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', '', text)
+    # Split text
+    text = re.split("[ \.,\-:@\/_ ?|#&*>=<;\"\n\t]", text)
 
     for word in text:
         word = word.lower()
         if word not in stopwords:
-            redisCont.incr(word, 1)
+            # increment the score for word
+            redisCont.zincrby("wordCount", word)
+            cnt += 1
 
-    for key in redisCont.keys():
-        word_count.append({"word": key.decode('UTF-8'), "count": int(redisCont.get(key).decode('UTF-8'))})
+    return cnt
 
 
 def main():
@@ -95,24 +102,25 @@ def main():
     # Clear redis container
     redisCont.flushall()
 
-    stopwords = get_stopwords()
+    stopwords = set(re.split('[ \n\t]', get_stopwords()))
     # Fetch twitter samples for "duration" seconds
     data = fetch_data(duration)
 
     # Initialise word_count and count words in data
     word_count = []
-    parse_data(data, stopwords, word_count, redisCont)
+    total_words_count = parse_data(data, stopwords, word_count, redisCont)
+    
+    # Get first nr_of_words words from redis
+    sorted = redisCont.zrevrange("wordCount", 0, nr_of_words - 1, withscores = True)
 
-    # Sort words by count
-    word_count = sorted(word_count, key = lambda k: k['count'], reverse = True)
-
-    # Keep first "nr_of_words" words and aggregate the rest into the word "other"
-    if nr_of_words < len(word_count):
-        # Compress words from nr_of_words to len(word_count) into word_count[nr_of_words]
-        word_count[nr_of_words]["word"] = "other"
-        for i in range(nr_of_words + 1, len(word_count)):
-            word_count[nr_of_words]["count"] += word_count[i]["count"]
-        word_count = word_count[:nr_of_words + 1]
+    # Add the words into an array, decode word and count how many words we have so far
+    top_words_count = 0
+    for word in sorted:
+        word_count.append({"word": word[0].decode('UTF-8'), "count": int(word[1])})
+        top_words_count += 1
+    
+    # Append the "other" word to word_count and set it's count
+    word_count.append({"word" : "other", "count" : total_words_count - top_words_count})
 
     word_count_json = json.dumps(word_count, separators=(', ', ': '), indent = 4, ensure_ascii = False)
 
@@ -120,7 +128,6 @@ def main():
         output.write(word_count_json)
 
     print("Done!")
-
 
 if __name__ == '__main__':
     main()
