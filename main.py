@@ -7,9 +7,7 @@ import re
 import tweepy
 import time
 
-
 class StreamListener(tweepy.StreamListener):
-
     def __init__(self, duration = 0):
         super(StreamListener, self).__init__()
         self.text = ""
@@ -36,9 +34,7 @@ class StreamListener(tweepy.StreamListener):
         print("error: ", status)
         return False
 
-
 def fetch_data(duration):
-
     with open('OAuth.json') as stream:
         keys = dict(json.load(stream))
 
@@ -65,7 +61,6 @@ def get_stopwords():
 
 
 def parse_data(text, stopwords, word_count, redisCont):
-
     cnt = 0
 
     # Remove links
@@ -82,9 +77,7 @@ def parse_data(text, stopwords, word_count, redisCont):
 
     return cnt
 
-
 def main():
-
     # Parse cmd args
     if sys.argv.__len__() == 3:
         try:
